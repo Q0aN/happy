@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Platform } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Text } from '@/components/StyledText';
 import { useRouter } from 'expo-router';
 import { Typography } from '@/constants/Typography';
@@ -10,6 +11,8 @@ import { ItemList } from '@/components/ItemList';
 import { ItemGroup } from '@/components/ItemGroup';
 import { Item } from '@/components/Item';
 import { t } from '@/text';
+import { QRCode } from '@/components/qr';
+import { Modal } from '@/modal';
 
 export default function TerminalConnectScreen() {
     const router = useRouter();
@@ -43,6 +46,28 @@ export default function TerminalConnectScreen() {
             // Convert the hash key format to the expected happy:// URL format
             const authUrl = `happy://terminal?${publicKey}`;
             await processAuthUrl(authUrl);
+        }
+    };
+
+    const shareUrl = React.useMemo(() => {
+        if (!publicKey || Platform.OS !== 'web' || typeof window === 'undefined') {
+            return null;
+        }
+        return `${window.location.origin}${window.location.pathname}#key=${publicKey}`;
+    }, [publicKey]);
+
+    const shouldShowQrCode = Platform.OS === 'web'
+        && typeof window !== 'undefined'
+        && window.innerWidth >= 768
+        && !!shareUrl;
+
+    const handleCopyLink = async () => {
+        if (!shareUrl) return;
+        try {
+            await Clipboard.setStringAsync(shareUrl);
+            Modal.alert(t('common.copied'), t('items.copiedToClipboard', { label: t('common.copy') }));
+        } catch {
+            Modal.alert(t('common.error'), t('markdown.copyFailed'));
         }
     };
 
@@ -150,7 +175,41 @@ export default function TerminalConnectScreen() {
 
     // Show confirmation screen for valid connection
     return (
-        <ItemList>
+            <ItemList>
+            {shouldShowQrCode && (
+                <ItemGroup title={t('settings.scanQrCodeToAuthenticate')}>
+                    <View style={{
+                        alignItems: 'center',
+                        paddingVertical: 24,
+                        paddingHorizontal: 16,
+                        gap: 16,
+                    }}>
+                        <QRCode
+                            data={shareUrl}
+                            size={220}
+                            backgroundColor="#FFFFFF"
+                            foregroundColor="#000000"
+                        />
+                        <Text style={{
+                            ...Typography.default(),
+                            fontSize: 14,
+                            color: '#666',
+                            textAlign: 'center',
+                            lineHeight: 20,
+                            maxWidth: 320,
+                        }}>
+                            {t('components.emptyMainScreen.scanQrCode')}
+                        </Text>
+                        <RoundButton
+                            title={t('common.copy')}
+                            size="normal"
+                            display="inverted"
+                            onPress={handleCopyLink}
+                        />
+                    </View>
+                </ItemGroup>
+            )}
+
             {/* Connection Request Header */}
             <ItemGroup>
                 <View style={{ 
